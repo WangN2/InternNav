@@ -122,6 +122,9 @@ work_dirs/
 /asset
 # /assets
 
+# Generated / extracted real-world sample data
+assets/realworld_sample_data*/
+
 
 # sphinx build dir
 docs/en/_build
@@ -152,3 +155,4 @@ checkpoints
 internnav/model/basemodel/LongCLIP/
 .gradio/
 result/
+model/
