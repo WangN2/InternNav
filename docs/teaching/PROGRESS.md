@@ -15,7 +15,7 @@
 | 01 全局架构与注册机制 | ✅ 已掌握 | 2026-06-29 | 良好 | 无 | 理解了注册机制与 5 个 Agent 的用途 |
 | 02 配置系统与入口脚本 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Pydantic 配置、三大入口与默认配置填充 |
 | 03 基线模型 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Seq2Seq/CMA/RDP/NavDP 的原理与差异 |
-| 04 InternVLA-N1 双系统模型 | ⬜ 未开始 | — | — | — | — |
+| 04 InternVLA-N1 双系统模型 | 🟡 进行中 | 2026-07-08 | 良好 | 4.7–4.9 待学习 | 理解双系统架构、S2/S1 协作与 Agent 运行模式 |
 | 05 环境封装与评测链路 | ⬜ 未开始 | — | — | — | — |
 | 06 训练、部署与工程实践 | ⬜ 未开始 | — | — | — | — |
 
@@ -107,6 +107,30 @@
 
 ---
 
+### 第 5 天（2026-07-08）
+
+- **学习主题**：第 4 章 · InternVLA-N1 双系统模型（4.1–4.6）
+- **对应计划条目**：第四阶段第 22 天
+- **完成情况**：
+  - [x] 理解双系统整体架构（System 2 + System 1）
+  - [x] 理解 System 2 的输入输出与 prompt 设计
+  - [x] 理解 System 1 的 nextdit / navdp 实现
+  - [x] 理解 `InternVLAN1Net` Policy 包装层
+  - [x] 理解 `InternVLAN1Agent` 的 `sync` / `partial_async` 运行模式
+  - [x] 理解两阶段训练流程（先训 System 2，再冻结 VLM 训 System 1）
+  - [x] 通过问答深入理解真实部署与仿真评测的 Agent 差异
+- **关键收获**：
+  - InternVLA-N1 = Qwen2.5-VL（System 2 规划）+ nextdit/navdp（System 1 控制）。
+  - System 2 输出 pixel goal / latent plan / 离散动作；System 1 生成连续轨迹。
+  - `s1_step_latent()` 内部生成连续轨迹，但仿真评测路径会解析为离散动作。
+  - `partial_async` 把慢速 S2 推理放到后台线程，主线程快速执行 S1。
+  - 训练分阶段：先 `train_system2.sh` 训 S2，再 `train_dual_system.sh` 冻结 VLM 训 S1。
+  - 仿真评测用 `InternVLAN1Agent` + `InternVLAN1Net`；真实部署用 `InternVLAN1AsyncAgent`。
+- **遇到的问题 / 疑问**：无
+- **下一步计划**：明天继续第 4 章 4.7 节（评测配置），后续依次讲解 4.8 真实部署、4.9 数据格式
+
+---
+
 ## 本次会话问答摘要
 
 ### 日期：2026-07-01
@@ -164,6 +188,36 @@
 **回答**：基线用于学术研究对照、更小更快更易部署、适配不同环境、作为学习阶梯。InternVLA-N1 是旗舰方案，但不是所有场景都需要 16GB 大模型。
 
 **收获**：深入理解了 Policy 与 Agent 的关系、Seq2SeqNet 与 CMANet 的架构差异、GRU 与 Transformer 的适用边界，以及项目 checkpoint 现状和基线价值。
+
+---
+
+### 日期：2026-07-08
+
+**问题 1**：latent plan 和 pixel goal 是搭配使用的吗？
+
+**回答**：不是必须搭配，而是二选一。pixel goal 是图像坐标，更直观；latent plan 是隐式向量，更抽象。具体用哪个由训练时的 `system1` 参数决定。
+
+**问题 2**：`look_down` 是调用下视相机吗？但我们没有下视相机。
+
+**回答**：`look_down` 不一定是单独相机，而是「相机以俯视角度拍摄」。仿真里通过调整相机俯仰角实现；真实世界里取决于硬件。当前真实部署代码只有一个前视相机，所以 `look_down=False`。
+
+**问题 3**：请讲解 `s1_step_latent()` 的代码。
+
+**回答**：`generate_traj()` 先生成连续轨迹 `dp_actions`，然后根据 `continuous_traj` 选择 `traj_to_actions()` 或 `chunk_token()` 把轨迹解析成离散动作，过滤 stop 后取前 4 个动作返回。这是为了和离散动作评测接口对齐。
+
+**问题 4**：`internvla_n1_agent.py` 的 `def step(self, obs)` 是谁来调用的？
+
+**回答**：`Agent.step(obs)` 是统一接口，由 `Evaluator`（本地/远程评测）或 `AgentServer` 调用。真实部署不用这个 Agent，而是用 `InternVLAN1AsyncAgent`。
+
+**问题 5**：真实部署用的是 `internvla_n1_agent_realworld.py` 吗？
+
+**回答**：是的。`scripts/realworld/http_internvla_server.py` 直接 import 并实例化 `InternVLAN1AsyncAgent`。它未注册到 `Agent.agents`，直接加载 `InternVLAN1ForCausalLM`，接口更适合帧-by-帧的真实部署。
+
+**问题 6**：如果想在 ROS2 中跑起来，是在 ROS2 中搭建 wrapper 然后实例化 `InternVLAN1AsyncAgent` 吗？
+
+**回答**：是的，有两种方案：① 直接在 ROS2 节点中实例化 `InternVLAN1AsyncAgent`，延迟最低但机器人需足够算力；② 沿用现有 HTTP Server + ROS2 Client 架构，模型放独立服务器，机器人端只做控制。
+
+**收获**：理解了 InternVLA-N1 双系统的工作流程、System 1 的连续轨迹到离散动作的转换、仿真与真实部署的 Agent 差异，以及 ROS2 部署的可行架构。
 
 ---
 
