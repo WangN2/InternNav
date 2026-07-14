@@ -15,7 +15,7 @@
 | 01 全局架构与注册机制 | ✅ 已掌握 | 2026-06-29 | 良好 | 无 | 理解了注册机制与 5 个 Agent 的用途 |
 | 02 配置系统与入口脚本 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Pydantic 配置、三大入口与默认配置填充 |
 | 03 基线模型 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Seq2Seq/CMA/RDP/NavDP 的原理与差异 |
-| 04 InternVLA-N1 双系统模型 | ✅ 已掌握 | 2026-07-09 | 良好 | 无 | 掌握双系统架构、S2/S1 协作、训练/评测/部署/数据格式 |
+| 04 InternVLA-N1 双系统模型 | ✅ 已掌握 | 2026-07-14 | 良好 | 无 | 掌握双系统架构、S2/S1 协作、训练/评测/部署/数据格式 |
 | 05 环境封装与评测链路 | 🟡 进行中 | — | — | — | — |
 | 06 训练、部署与工程实践 | ⬜ 未开始 | — | — | — | — |
 
@@ -131,25 +131,26 @@
 
 ---
 
-### 第 6 天（2026-07-09）
+### 第 6 天（2026-07-14）
 
-- **学习主题**：第 4 章收尾 · InternVLA-N1 评测/部署/数据格式 + 自测
-- **对应计划条目**：第四阶段第 22–24 天
+- **学习主题**：第 4 章收尾 · InternVLA-N1 评测/部署/数据格式 + 自测 + 环境链路预习
+- **对应计划条目**：第四阶段第 22–24 天、第五阶段第 25 天
 - **完成情况**：
-  - [x] 理解评测配置 `h1_internvla_n1_async_cfg.py`
-  - [x] 理解 `robot_flash`、`one_step_stand_still`、`filter_stairs` 等关键参数
-  - [x] 理解真实部署 `InternVLAN1AsyncAgent` + Flask Server + ROS2 Client 链路
-  - [x] 理解 `control_thread` 与 `planning_thread` 的分工
-  - [x] 理解 LeRobot v0.5 数据格式与 `task` 字段变更
-  - [x] 完成第 4 章 8 道自测题
+  - [x] 完成 4.7 评测配置教学
+  - [x] 完成 4.8 真实世界部署教学
+  - [x] 完成 4.9 数据格式 v0.5 教学
+  - [x] 完成第 4 章 8 道自测题并逐题讲解
+  - [x] 通过问答深入理解 `partial_async`、`control_thread`、episode/batch 数据量
+  - [x] 开始第 5 章环境封装与评测链路概览（已暂停，待后续继续）
 - **关键收获**：
-  - 仿真评测默认用 `partial_async`，真实部署本质上也是异步（`PLAN_STEP_GAP`）。
-  - `robot_flash=True` 直接设置 world pose，速度快；物理模式需要更细粒度控制。
-  - `control_thread` 一直 10Hz 运行，只在拿到 MPC 参考轨迹或 PID 目标后才真正发布速度。
-  - 一个 episode 数据量取决于帧数和图像数量；训练时 `batch_size=2` 指的是 2 个子轨迹 sample。
-  - v0.5 用 `task` 字段替代 `instruction_text`，在 `internvla_n1_lerobot_dataset.py:770` 读取。
+  - 仿真评测默认用 `partial_async`，真实部署 `InternVLAN1AsyncAgent` 也按 `PLAN_STEP_GAP` 异步触发 S2。
+  - `control_thread` 从 ROS2 client 启动后一直 10Hz 运行，有目标时才发布 `/cmd_vel_bridge`。
+  - `robot_flash=True` 直接设置 world pose；`one_step_stand_still=True` 保证 dual system 图像稳定。
+  - 一个 episode 原始数据几十到几百 MB；训练时 `batch_size=2` 指 2 个子轨迹 sample。
+  - LeRobot v0.5 用 `task` 替代 `instruction_text`，在 `internvla_n1_lerobot_dataset.py:770` 读取。
+  - 第 5 章三种环境（Habitat/InternUtopia/RealWorld）和四种评测器初步了解。
 - **遇到的问题 / 疑问**：无
-- **下一步计划**：进入第 5 章 · 环境封装与评测链路
+- **下一步计划**：暂停第 5 章，后续按学习节奏继续
 
 ---
 
@@ -240,6 +241,28 @@
 **回答**：是的，有两种方案：① 直接在 ROS2 节点中实例化 `InternVLAN1AsyncAgent`，延迟最低但机器人需足够算力；② 沿用现有 HTTP Server + ROS2 Client 架构，模型放独立服务器，机器人端只做控制。
 
 **收获**：理解了 InternVLA-N1 双系统的工作流程、System 1 的连续轨迹到离散动作的转换、仿真与真实部署的 Agent 差异，以及 ROS2 部署的可行架构。
+
+---
+
+### 日期：2026-07-14
+
+**问题 1**：`control_thread` 是什么时候工作的？
+
+**回答**：`control_thread` 在 `http_internvla_client.py` 启动时就开始运行（`__main__` 里 `start()`），是 10Hz 的无限循环。初始阶段没有 MPC/PID 目标时不发布速度；`planning_thread` 拿到 trajectory 后更新 MPC 参考轨迹并切到 `MPC_Mode`，或拿到 discrete_action 后更新 `homo_goal` 并切到 `PID_Mode`，之后 `control_thread` 每 100ms 解算并发布 `/cmd_vel_bridge`。它只在真实部署 ROS2 client 中存在，仿真模式没有。
+
+**问题 2**：现在项目用的是 `partial_async` 吗？
+
+**回答**：是的。仿真评测配置 `h1_internvla_n1_async_cfg.py` 中 `infer_mode='partial_async'`；真实部署 `InternVLAN1AsyncAgent` 也按 `PLAN_STEP_GAP` 间隔触发 System 2，两次 S2 之间复用 latent 给 System 1，本质同样是异步。
+
+**问题 3**：目前一个 episode 数据量多大，一个 batch 多大？
+
+**回答**：一个 episode 是一条导航轨迹，LeRobot 格式下包含 meta、parquet、多张 RGB/深度图，数据量通常几十到几百 MB。训练时 `NavPixelGoalDataset` 把 episode 按 `sample_step` 切成多个子轨迹 sample；`train_system2.sh` 中 `per_device_train_batch_size=2` 指每个 GPU 每步处理 2 个 sample。全局 batch size = `2 × num_gpus × gradient_accumulation_steps`。
+
+**问题 4**：为什么第 5 章先不继续？
+
+**回答**：用户希望先完成学习记录更新，第 5 章内容已做概览介绍，后续按节奏继续。
+
+**收获**：巩固了 InternVLA-N1 的异步推理机制、真实部署控制线程时序、训练数据量级与 batch 概念，并梳理了三种环境/四种评测器的整体关系。
 
 ---
 
