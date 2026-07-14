@@ -15,8 +15,8 @@
 | 01 全局架构与注册机制 | ✅ 已掌握 | 2026-06-29 | 良好 | 无 | 理解了注册机制与 5 个 Agent 的用途 |
 | 02 配置系统与入口脚本 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Pydantic 配置、三大入口与默认配置填充 |
 | 03 基线模型 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Seq2Seq/CMA/RDP/NavDP 的原理与差异 |
-| 04 InternVLA-N1 双系统模型 | 🟡 进行中 | 2026-07-08 | 良好 | 4.7–4.9 待学习 | 理解双系统架构、S2/S1 协作与 Agent 运行模式 |
-| 05 环境封装与评测链路 | ⬜ 未开始 | — | — | — | — |
+| 04 InternVLA-N1 双系统模型 | ✅ 已掌握 | 2026-07-09 | 良好 | 无 | 掌握双系统架构、S2/S1 协作、训练/评测/部署/数据格式 |
+| 05 环境封装与评测链路 | 🟡 进行中 | — | — | — | — |
 | 06 训练、部署与工程实践 | ⬜ 未开始 | — | — | — | — |
 
 ---
@@ -128,6 +128,28 @@
   - 仿真评测用 `InternVLAN1Agent` + `InternVLAN1Net`；真实部署用 `InternVLAN1AsyncAgent`。
 - **遇到的问题 / 疑问**：无
 - **下一步计划**：明天继续第 4 章 4.7 节（评测配置），后续依次讲解 4.8 真实部署、4.9 数据格式
+
+---
+
+### 第 6 天（2026-07-09）
+
+- **学习主题**：第 4 章收尾 · InternVLA-N1 评测/部署/数据格式 + 自测
+- **对应计划条目**：第四阶段第 22–24 天
+- **完成情况**：
+  - [x] 理解评测配置 `h1_internvla_n1_async_cfg.py`
+  - [x] 理解 `robot_flash`、`one_step_stand_still`、`filter_stairs` 等关键参数
+  - [x] 理解真实部署 `InternVLAN1AsyncAgent` + Flask Server + ROS2 Client 链路
+  - [x] 理解 `control_thread` 与 `planning_thread` 的分工
+  - [x] 理解 LeRobot v0.5 数据格式与 `task` 字段变更
+  - [x] 完成第 4 章 8 道自测题
+- **关键收获**：
+  - 仿真评测默认用 `partial_async`，真实部署本质上也是异步（`PLAN_STEP_GAP`）。
+  - `robot_flash=True` 直接设置 world pose，速度快；物理模式需要更细粒度控制。
+  - `control_thread` 一直 10Hz 运行，只在拿到 MPC 参考轨迹或 PID 目标后才真正发布速度。
+  - 一个 episode 数据量取决于帧数和图像数量；训练时 `batch_size=2` 指的是 2 个子轨迹 sample。
+  - v0.5 用 `task` 字段替代 `instruction_text`，在 `internvla_n1_lerobot_dataset.py:770` 读取。
+- **遇到的问题 / 疑问**：无
+- **下一步计划**：进入第 5 章 · 环境封装与评测链路
 
 ---
 
