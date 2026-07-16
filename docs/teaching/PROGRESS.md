@@ -16,8 +16,8 @@
 | 02 配置系统与入口脚本 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Pydantic 配置、三大入口与默认配置填充 |
 | 03 基线模型 | ✅ 已掌握 | 2026-07-01 | 良好 | 无 | 理解了 Seq2Seq/CMA/RDP/NavDP 的原理与差异 |
 | 04 InternVLA-N1 双系统模型 | ✅ 已掌握 | 2026-07-14 | 良好 | 无 | 掌握双系统架构、S2/S1 协作、训练/评测/部署/数据格式 |
-| 05 环境封装与评测链路 | ⬜ 未开始 | — | — | — | — |
-| 06 训练、部署与工程实践 | ⬜ 未开始 | — | — | — | — |
+| 05 环境封装与评测链路 | ✅ 已掌握 | 2026-07-16 | 良好 | 无 | 掌握三种环境、四种评测器、use_agent_server、Ray 模式 |
+| 06 训练、部署与工程实践 | 🟡 进行中 | — | — | — | — |
 
 ---
 
@@ -152,6 +152,31 @@
 
 ---
 
+### 第 7 天（2026-07-16）
+
+- **学习主题**：第 5 章 · 环境封装与评测链路
+- **对应计划条目**：第五阶段第 25–28 天
+- **完成情况**：
+  - [x] 理解三种环境（Habitat/InternUtopia/RealWorld）的定位与动作空间
+  - [x] 理解环境基类 `Env` 的注册机制
+  - [x] 理解四种评测器（`vln_distributed`、`habitat_vln`、`habitat_evaluator`、`habitat_dialog`）
+  - [x] 理解 `use_agent_server=True/False` 两种模式的区别与限制
+  - [x] 理解 `vln_default_config.py` 的默认配置填充逻辑
+  - [x] 理解 Ray 模式与普通 InternUtopia 模式的区别
+  - [x] 走读 `InternutopiaEnv` 初始化、`VLNDistributedEvaluator` 状态机、`DistributedEvaluator` Agent 初始化分支
+  - [x] 完成第 5 章 8 道自测题并讲解
+- **关键收获**：
+  - Habitat 离散快、InternUtopia 物理真实、RealWorld 真实机器人。
+  - `env_type` 决定创建哪个环境类；`eval_type` 决定创建哪个评测器。
+  - `InternutopiaEnv.step()` 接收控制器 dict 列表，不是连续轨迹。
+  - `use_agent_server=True` 把推理拆成 HTTP 服务，不支持 torch.distributed。
+  - `vln_default_config.py` 目前只支持 H1，换机器人要扩展 `get_config()`。
+  - Ray 模式分布的是环境 worker，普通 torchrun 分布的是评测进程。
+- **遇到的问题 / 疑问**：无
+- **下一步计划**：进入第 6 章 · 训练、部署与工程实践
+
+---
+
 ## 本次会话问答摘要
 
 ### 日期：2026-07-01
@@ -257,6 +282,32 @@
 **回答**：一个 episode 是一条导航轨迹，LeRobot 格式下包含 meta、parquet、多张 RGB/深度图，数据量通常几十到几百 MB。训练时 `NavPixelGoalDataset` 把 episode 按 `sample_step` 切成多个子轨迹 sample；`train_system2.sh` 中 `per_device_train_batch_size=2` 指每个 GPU 每步处理 2 个 sample。全局 batch size = `2 × num_gpus × gradient_accumulation_steps`。
 
 **收获**：巩固了 InternVLA-N1 的异步推理机制、真实部署控制线程时序、训练数据量级与 batch 概念。
+
+---
+
+### 日期：2026-07-16（第 5 章学习问答）
+
+**问题 1**：`internutopia` 是什么？
+
+**回答**：`InternUtopia` 是基于 NVIDIA Isaac Sim 的具身智能仿真器（原 GRUtopia），用于模拟机器人在真实三维场景中的物理运动和交互，支持重力、碰撞、连续控制、H1 等人形机器人模型，适用于 VLN-PE 和 Dual-System VLN 评测。
+
+**问题 2**：Python 配置文件都是类似 `vln_default_config.py` 这种吗？以前 C++ 常用 JSON/XML。
+
+**回答**：评测/训练主配置是 Python 文件，因为需要 Pydantic 类型校验、嵌套对象、条件分支、import 代码常量。DeepSpeed 用 JSON，工程工具链用 TOML/YAML/cfg。Python 配置相当于"可执行、可分支、带类型检查的配置脚本"，比 JSON/XML 更灵活。
+
+**问题 3**：什么是 Ray 模式？
+
+**回答**：Ray 是一个分布式计算框架。在 InternNav 里，Ray 模式（`internutopia_vec_env`）把多个 InternUtopia 仿真环境分布到多台机器/多个进程并行跑；普通 `internutopia` 模式通过 `torchrun` 把多个评测进程分布到多卡。两者分布式对象不同。
+
+**问题 4**：自测题中容易混淆的点有哪些？
+
+**回答**：
+- Ray 不是独立的 `env_type`，`env_type` 仍是 `internutopia`。
+- `action=[0]` 对应 `{'h1': {'stop': []}}`，不是泛泛的"离散控制器"。
+- `use_agent_server=True` 不支持 torch.distributed，因为要求单评测进程。
+- Ray 模式分布的是环境 worker，不是直接把模型拆到多卡。
+
+**收获**：理解了 InternUtopia 与 Habitat 的平台差异、Python 配置相比 JSON/XML 的优势、Ray 分布式与普通多卡分布的区别，以及评测链路中环境/评测器/Agent 的协作关系。
 
 ---
 
