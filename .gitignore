@@ -156,3 +156,6 @@ internnav/model/basemodel/LongCLIP/
 .gradio/
 result/
 model/
+
+# Runtime-generated test/debug output (timestamped dirs with debug images & llm outputs)
+test_data/

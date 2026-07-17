@@ -19,12 +19,12 @@ deepspeed=scripts/train/qwenvl_train/zero2.json
 llm=Qwen/Qwen2.5-VL-7B-Instruct
 
 # Training hyperparameters
-lr=2e-5
-vision_tower_lr=5e-6
+lr=2e-5                 # LLM 部分学习率 0.00002
+vision_tower_lr=5e-6    # 视觉编码器学习率 0.000005
 batch_size=2
 grad_accum_steps=1
-max_pixels=313600
-min_pixels=3136
+max_pixels=313600       # 图像最大像素 (≈560×560)
+min_pixels=3136         # 图像最小像素 (≈56×56)
 
 # Dataset configuration (replace with public dataset names)
 vln_datasets=r2r_125cm_0_30,r2r_125cm_0_45,r2r_60cm_15_15,r2r_60cm_30_30,rxr_125cm_0_30,rxr_125cm_0_45,rxr_60cm_15_15,rxr_60cm_30_30 #,scalevln_125cm_0_30,scalevln_60cm_30_30

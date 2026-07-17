@@ -101,7 +101,7 @@ class LuminaNextDiTBlock(nn.Module):
 
         self.feed_forward = LuminaFeedForward(
             dim=dim,
-            inner_dim=4 * dim,
+            inner_dim=int(8 / 3 * dim),
             multiple_of=multiple_of,
             ffn_dim_multiplier=ffn_dim_multiplier,
         )
@@ -292,7 +292,11 @@ class LuminaNextDiT2DModel(ModelMixin, ConfigMixin):
 
         assert (hidden_size // num_attention_heads) % 4 == 0, "2d rope needs head dim to be divisible by 4"
 
-    def _set_gradient_checkpointing(self, module, value=False):
+    def _set_gradient_checkpointing(self, module=None, value=False, enable=None, gradient_checkpointing_func=None):
+        if module is None:
+            module = self
+        if enable is not None:
+            value = enable
         if hasattr(module, "gradient_checkpointing"):
             module.gradient_checkpointing = value
 
